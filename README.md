@@ -51,7 +51,3 @@ Then open `http://localhost:8000` in your browser.
 - No backend required - fully client-side
 - Works offline once files are loaded
 
-## License
-
-[Add your license here]
-
