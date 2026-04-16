@@ -1,0 +1,28 @@
+{
+    "group": "Philanthropic",
+    "dimensions": [
+      {
+        "id": "philanthropic",
+        "label": "Philanthropic support",
+        "description": "Total philanthropic capacity, aligned funder presence, and aligned nonprofit ecosystem.",
+        "subs": [
+          {
+            "field": "Philanthropic Support - Sheet1 (1)_Total Philanthropic Capacity",
+            "label": "Total philanthropic capacity",
+            "defaultWeight": 0.34
+          },
+          {
+            "field": "Philanthropic Support - Sheet1 (1)_Aligned Funder Presence",
+            "label": "Aligned funder presence",
+            "defaultWeight": 0.33
+          },
+          {
+            "field": "Philanthropic Support - Sheet1 (1)_Aligned Nonprofit Ecosystem",
+            "label": "Aligned nonprofit ecosystem",
+            "defaultWeight": 0.33
+          }
+        ]
+      }
+    ]
+  }
+

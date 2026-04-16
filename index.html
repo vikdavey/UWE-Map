@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UWE Map</title>
+  <link
+    href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      overflow: hidden;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #dimensions-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 320px;
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .group-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .group-title:first-child {
+      margin-top: 0;
+    }
+
+    .dim-card {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .dim-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .dim-header:hover {
+      opacity: 0.8;
+    }
+
+    .dim-chevron {
+      font-size: 12px;
+      color: #666;
+      transition: transform 0.2s ease;
+      margin-left: 8px;
+    }
+
+    .dim-card.collapsed .dim-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .dim-content {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      overflow: hidden;
+    }
+
+    .dim-card.collapsed .dim-content {
+      max-height: 0;
+      opacity: 0;
+      margin: 0;
+      padding: 0;
+    }
+
+    .dim-card:not(.collapsed) .dim-content {
+      max-height: 2000px;
+      opacity: 1;
+    }
+
+    .dim-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .dim-label {
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .dim-description {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .sub-row {
+      margin-bottom: 10px;
+    }
+
+    .sub-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .sub-row-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .sub-row-label span:first-child {
+      color: #555;
+    }
+
+    .sub-row-label span:last-child {
+      color: #888;
+      font-weight: 500;
+    }
+
+    .sub-row input[type="range"] {
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: #ddd;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .sub-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #2b8cbe;
+      cursor: pointer;
+    }
+
+    .sub-row input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #2b8cbe;
+      cursor: pointer;
+      border: none;
+    }
+
+    .toggle-row {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .toggle-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: #555;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    /* Scrollbar styling */
+    #dimensions-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #dimensions-panel::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    #dimensions-panel::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    #dimensions-panel::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* Popup styling for scrollable content */
+    .maplibregl-popup-content {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .maplibregl-popup-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .maplibregl-popup-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    .maplibregl-popup-content::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    .maplibregl-popup-content::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* Legend */
+    #legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 12px;
+      z-index: 1000;
+      font-size: 12px;
+    }
+
+    #legend-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 12px;
+      margin-right: 8px;
+      border: 1px solid #ccc;
+    }
+
+    .legend-label {
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="dimensions-panel"></div>
+  <div id="legend">
+    <div id="legend-title">Score Intensity</div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #ffffff;"></div>
+      <span class="legend-label">Low (0.0)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #aaaaaa;"></div>
+      <span class="legend-label">Medium (0.5)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #000000;"></div>
+      <span class="legend-label">High (1.0)</span>
+    </div>
+    <div style="margin-top: 8px; font-size: 11px; color: #666; font-style: italic;">
+      Darker = Better
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+
+  <script>
+    // ---------- FILE PATHS ----------
+    const COUNTY_FILE      = "county_core.geojson";
+    const BROWNFIELD_FILE  = "Real Estate/brownfieldcoords.geojson";
+    const MILL_FILE        = "WoodEnergy/mills_points.geojson";
+
+    const CONFIG_FILES = [
+      "Real Estate/real_estate.json",
+      "WoodEnergy/wood_energy.json",
+      "Philanthropic/philanthropic.json",
+      "City & County Climate/climate.json",
+      "Arborist Company Presence & Needs/arborist.json",
+      "Private Sector/private_sector.json"
+    ];
+
+    // Group names as used in JSON configs
+    const REAL_GROUP = "Real estate";
+    const WOOD_GROUP = "Wood & Energy";
+    const PHILANTHROPIC_GROUP = "Philanthropic";
+    const CLIMATE_GROUP = "City & County Climate";
+    const ARBORIST_GROUP = "Arborist Company Presence & Needs";
+    const PRIVATE_SECTOR_GROUP = "Private Sector";
+
+    // Property keys in data
+    const PROP_COUNTY_NAME = "NAME";
+    const PROP_STATE       = "STATEFP";
+
+    const PROP_BF_NAME = "PRIMARY_NAME";
+    const PROP_BF_URL  = "FRS_FACILITY_DETAIL_REPORT_URL";
+
+    const PROP_MILL_NAME = "MEANING";
+    const PROP_MILL_TYPE = "MILL_TYPE_CD";
+
+    // State FIPS code to state name mapping
+    const STATE_NAMES = {
+      "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
+      "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
+      "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
+      "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
+      "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
+      "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska", "32": "Nevada",
+      "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico", "36": "New York",
+      "37": "North Carolina", "38": "North Dakota", "39": "Ohio", "40": "Oklahoma",
+      "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island", "45": "South Carolina",
+      "46": "South Dakota", "47": "Tennessee", "48": "Texas", "49": "Utah", "50": "Vermont",
+      "51": "Virginia", "53": "Washington", "54": "West Virginia", "55": "Wisconsin",
+      "56": "Wyoming", "60": "American Samoa", "66": "Guam", "69": "Northern Mariana Islands",
+      "72": "Puerto Rico", "78": "U.S. Virgin Islands"
+    };
+
+    function getStateName(stateFips) {
+      return STATE_NAMES[stateFips] || stateFips;
+    }
+
+    // ---------- STATE ----------
+    let DIMENSIONS = [];
+    const activeDims = {};
+    const dimWeights = {};
+    const subWeights = {};
+
+    const panel = document.getElementById("dimensions-panel");
+
+    // ---------- HELPERS ----------
+    function normalize(obj) {
+      const vals = Object.values(obj);
+      const sum = vals.reduce((a, b) => a + b, 0);
+      if (!sum) return { ...obj };
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) out[k] = v / sum;
+      return out;
+    }
+
+    // score for one group (real or wood), in [0,1], as a MapLibre expression
+    function buildScoreForGroup(groupName) {
+      const dims = DIMENSIONS.filter(dim => dim.group === groupName);
+      const fieldWeights = {};
+
+      const dimRaw = {};
+      dims.forEach(dim => {
+        if (activeDims[dim.id]) {
+          dimRaw[dim.id] = dimWeights[dim.id] || 0;
+        }
+      });
+      const dimNorm = normalize(dimRaw);
+
+      dims.forEach(dim => {
+        const dimId = dim.id;
+        const wj = dimNorm[dimId];
+        if (!wj) return;
+
+        const subs = subWeights[dimId] || {};
+        const subsNorm = normalize(subs);
+
+        for (const [field, ak] of Object.entries(subsNorm)) {
+          const totalW = wj * ak;
+          if (!totalW) continue;
+          fieldWeights[field] = (fieldWeights[field] || 0) + totalW;
+        }
+      });
+
+      const terms = Object.entries(fieldWeights).map(([field, weight]) => [
+        "*",
+        weight,
+        ["to-number", ["get", field], 0]
+      ]);
+
+      // Always return a valid expression; if nothing active, score = 0
+      if (!terms.length) {
+        return ["literal", 0];
+      }
+      return ["+", ...terms];
+    }
+
+    function anyActiveInGroup(groupName) {
+      return DIMENSIONS.some(dim => dim.group === groupName && activeDims[dim.id]);
+    }
+
+    // combined score = sum of all active groups (tints add together), clamped to 1.0
+    function buildCombinedScore() {
+      const realExpr = buildScoreForGroup(REAL_GROUP);
+      const woodExpr = buildScoreForGroup(WOOD_GROUP);
+      const philanthropicExpr = buildScoreForGroup(PHILANTHROPIC_GROUP);
+      const climateExpr = buildScoreForGroup(CLIMATE_GROUP);
+      const arboristExpr = buildScoreForGroup(ARBORIST_GROUP);
+      const privateSectorExpr = buildScoreForGroup(PRIVATE_SECTOR_GROUP);
+
+      const realOn = anyActiveInGroup(REAL_GROUP) ? 1 : 0;
+      const woodOn = anyActiveInGroup(WOOD_GROUP) ? 1 : 0;
+      const philanthropicOn = anyActiveInGroup(PHILANTHROPIC_GROUP) ? 1 : 0;
+      const climateOn = anyActiveInGroup(CLIMATE_GROUP) ? 1 : 0;
+      const arboristOn = anyActiveInGroup(ARBORIST_GROUP) ? 1 : 0;
+      const privateSectorOn = anyActiveInGroup(PRIVATE_SECTOR_GROUP) ? 1 : 0;
+      const totalActive = realOn + woodOn + philanthropicOn + climateOn + arboristOn + privateSectorOn;
+
+      // Add all active scores together
+      if (totalActive === 0) {
+        return ["literal", 0];
+      } else if (totalActive === 1) {
+        // Only one group active, use it directly
+        if (realOn) return realExpr;
+        if (woodOn) return woodExpr;
+        if (philanthropicOn) return philanthropicExpr;
+        if (climateOn) return climateExpr;
+        if (arboristOn) return arboristExpr;
+        if (privateSectorOn) return privateSectorExpr;
+        return ["literal", 0];
+      } else {
+        // Multiple groups active, add them together and clamp to 1.0
+        const activeExprs = [];
+        if (realOn) activeExprs.push(realExpr);
+        if (woodOn) activeExprs.push(woodExpr);
+        if (philanthropicOn) activeExprs.push(philanthropicExpr);
+        if (climateOn) activeExprs.push(climateExpr);
+        if (arboristOn) activeExprs.push(arboristExpr);
+        if (privateSectorOn) activeExprs.push(privateSectorExpr);
+
+        if (activeExprs.length === 1) {
+          return activeExprs[0];
+        } else {
+          // Build sum expression
+          const sumExpr = activeExprs.length === 2 
+            ? ["+", activeExprs[0], activeExprs[1]]
+            : activeExprs.reduce((acc, expr, idx) => {
+                if (idx === 0) return expr;
+                return ["+", acc, expr];
+              });
+          
+          // Clamp sum to 1.0
+          return [
+            "min",
+            1,
+            sumExpr
+          ];
+        }
+      }
+    }
+
+    // single grayscale ramp 0 = white, 1 = black
+    function colorRampCombined(scoreExpr) {
+      return [
+        "interpolate", ["linear"], scoreExpr,
+        0.0, "#ffffff",
+        0.25, "#dddddd",
+        0.5, "#aaaaaa",
+        0.75, "#555555",
+        1.0, "#000000"
+      ];
+    }
+
+    function debounce(fn, delay) {
+      let t;
+      return function () {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, arguments), delay);
+      };
+    }
+
+    async function loadAllConfigs() {
+      DIMENSIONS = [];
+      for (const path of CONFIG_FILES) {
+        const res = await fetch(path);
+        const cfg = await res.json();
+        const groupName = cfg.group || "Dimensions";
+        const dims = (cfg.dimensions || []).map(dim => ({
+          ...dim,
+          group: groupName
+        }));
+        DIMENSIONS.push(...dims);
+      }
+
+      DIMENSIONS.forEach(dim => {
+        activeDims[dim.id] = true;
+        dimWeights[dim.id] = 1.0;
+        const subs = {};
+        (dim.subs || []).forEach(sub => {
+          subs[sub.field] = sub.defaultWeight ?? 1;
+        });
+        subWeights[dim.id] = subs;
+      });
+    }
+
+    function buildDimensionsUI(map) {
+      panel.innerHTML = "";
+      if (!DIMENSIONS.length) return;
+
+      const groups = {};
+      DIMENSIONS.forEach(dim => {
+        const groupName = dim.group || "Dimensions";
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(dim);
+      });
+
+      Object.entries(groups).forEach(([groupName, dims]) => {
+        const groupTitle = document.createElement("div");
+        groupTitle.className = "group-title";
+        groupTitle.textContent = groupName;
+        panel.appendChild(groupTitle);
+
+        dims.forEach(dim => {
+          const card = document.createElement("div");
+          card.className = "dim-card collapsed";
+          card.dataset.dimId = dim.id;
+
+          const header = document.createElement("div");
+          header.className = "dim-header";
+
+          const headerLeft = document.createElement("div");
+          headerLeft.className = "dim-header-left";
+
+          const check = document.createElement("input");
+          check.type = "checkbox";
+          check.checked = activeDims[dim.id];
+          check.dataset.role = "dim-active";
+          check.dataset.dimId = dim.id;
+
+          const labelSpan = document.createElement("span");
+          labelSpan.className = "dim-label";
+          labelSpan.textContent = dim.label;
+
+          headerLeft.appendChild(check);
+          headerLeft.appendChild(labelSpan);
+          header.appendChild(headerLeft);
+
+          // Add chevron icon
+          const chevron = document.createElement("span");
+          chevron.className = "dim-chevron";
+          chevron.textContent = "▼";
+          header.appendChild(chevron);
+
+          // Make header clickable to toggle collapse (but not when clicking checkbox)
+          header.addEventListener("click", (e) => {
+            if (e.target.type !== "checkbox") {
+              card.classList.toggle("collapsed");
+            }
+          });
+
+          card.appendChild(header);
+
+          // Wrap content in collapsible container
+          const content = document.createElement("div");
+          content.className = "dim-content";
+
+          if (dim.description) {
+            const desc = document.createElement("div");
+            desc.className = "dim-description";
+            desc.textContent = dim.description;
+            content.appendChild(desc);
+          }
+
+          (dim.subs || []).forEach(sub => {
+            const subRow = document.createElement("div");
+            subRow.className = "sub-row";
+
+            const subLabelRow = document.createElement("div");
+            subLabelRow.className = "sub-row-label";
+            const subNameSpan = document.createElement("span");
+            subNameSpan.textContent = sub.label;
+            const subWeightSpan = document.createElement("span");
+            subWeightSpan.id = `sub-weight-label-${dim.id}-${sub.field}`;
+            subWeightSpan.textContent = `${Math.round((subWeights[dim.id][sub.field] || 0) * 100)}%`;
+            subLabelRow.appendChild(subNameSpan);
+            subLabelRow.appendChild(subWeightSpan);
+            subRow.appendChild(subLabelRow);
+
+            const subSlider = document.createElement("input");
+            subSlider.type = "range";
+            subSlider.min = "0";
+            subSlider.max = "100";
+            subSlider.value = String(Math.round((subWeights[dim.id][sub.field] || 0) * 100));
+            subSlider.dataset.role = "sub-weight";
+            subSlider.dataset.dimId = dim.id;
+            subSlider.dataset.field = sub.field;
+            subRow.appendChild(subSlider);
+
+            content.appendChild(subRow);
+          });
+
+          if (dim.overlays) {
+            dim.overlays.forEach(ov => {
+              const row = document.createElement("div");
+              row.className = "toggle-row";
+
+              const label = document.createElement("label");
+              const ovCheck = document.createElement("input");
+              ovCheck.type = "checkbox";
+              ovCheck.checked = !!ov.default;
+              ovCheck.dataset.role = "overlay-toggle";
+              ovCheck.dataset.layer = ov.layer;
+
+              ovCheck.addEventListener("change", e => {
+                const visible = e.target.checked ? "visible" : "none";
+                if (map.getLayer(ov.layer)) {
+                  map.setLayoutProperty(ov.layer, "visibility", visible);
+                }
+              });
+
+              label.appendChild(ovCheck);
+              label.append(" " + ov.label);
+              row.appendChild(label);
+              content.appendChild(row);
+            });
+          }
+
+          card.appendChild(content);
+          panel.appendChild(card);
+        });
+      });
+    }
+
+    function updateSubWeightsFromSliders(dimId) {
+      const card = panel.querySelector(`.dim-card[data-dim-id="${dimId}"]`);
+      if (!card) return;
+
+      const sliders = card.querySelectorAll('input[data-role="sub-weight"]');
+      const raw = {};
+      sliders.forEach(sl => {
+        const field = sl.dataset.field;
+        const val = Number(sl.value);
+        raw[field] = val;
+      });
+      const norm = normalize(raw);
+      subWeights[dimId] = norm;
+
+      sliders.forEach(sl => {
+        const field = sl.dataset.field;
+        const label = document.getElementById(`sub-weight-label-${dimId}-${field}`);
+        if (label) label.textContent = `${Math.round((norm[field] || 0) * 100)}%`;
+      });
+    }
+
+    // ---------- MAP ----------
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://demotiles.maplibre.org/style.json",
+      center: [-98.5, 39.8],
+      zoom: 3
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    let popup;
+
+    const updateMapStyle = debounce(() => {
+      const combinedExpr = buildCombinedScore();
+      if (map.getLayer("counties-fill")) {
+        map.setPaintProperty("counties-fill", "fill-color", colorRampCombined(combinedExpr));
+      }
+    }, 60);
+
+    map.on("load", async () => {
+      await loadAllConfigs();
+
+      map.addSource("counties", { type: "geojson", data: COUNTY_FILE });
+      map.addSource("brownfields", { type: "geojson", data: BROWNFIELD_FILE });
+      map.addSource("mills", { type: "geojson", data: MILL_FILE });
+
+      const combinedExprInit = buildCombinedScore();
+
+      map.addLayer({
+        id: "counties-fill",
+        type: "fill",
+        source: "counties",
+        paint: {
+          "fill-color": colorRampCombined(combinedExprInit),
+          "fill-opacity": 0.9
+        }
+      });
+
+      map.addLayer({
+        id: "counties-outline",
+        type: "line",
+        source: "counties",
+        paint: {
+          "line-color": "#333",
+          "line-width": 0.4
+        }
+      });
+
+      map.addLayer({
+        id: "mills-circle",
+        type: "circle",
+        source: "mills",
+        paint: {
+          "circle-radius": [
+            "interpolate", ["linear"], ["zoom"],
+            3, 2.5,
+            7, 4.5,
+            10, 7
+          ],
+          "circle-color": "#2b8cbe",
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 0.8
+        }
+      });
+
+      map.addLayer({
+        id: "brownfields-circle",
+        type: "circle",
+        source: "brownfields",
+        paint: {
+          "circle-radius": [
+            "interpolate", ["linear"], ["zoom"],
+            3, 2,
+            7, 4,
+            10, 6
+          ],
+          "circle-color": "#ff5500",
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1
+        }
+      });
+
+      // keep brownfields on top
+      map.moveLayer("brownfields-circle");
+
+      buildDimensionsUI(map);
+
+      // panel events
+      panel.addEventListener("input", e => {
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target.dataset.role === "sub-weight") {
+          updateSubWeightsFromSliders(target.dataset.dimId);
+          updateMapStyle();
+        }
+      });
+
+      panel.addEventListener("change", e => {
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target.dataset.role === "dim-active") {
+          activeDims[target.dataset.dimId] = target.checked;
+          updateMapStyle();
+        }
+      });
+
+      // apply default overlay visibilities from configs
+      DIMENSIONS.forEach(dim => {
+        (dim.overlays || []).forEach(ov => {
+          if (map.getLayer(ov.layer)) {
+            map.setLayoutProperty(
+              ov.layer,
+              "visibility",
+              ov.default ? "visible" : "none"
+            );
+          }
+        });
+      });
+
+      // click handling for mills, brownfields, counties
+      map.on("click", e => {
+        // mills
+        const millHits = map.queryRenderedFeatures(e.point, { layers: ["mills-circle"] });
+        if (millHits.length > 0) {
+          const f = millHits[0];
+          const coords = f.geometry.coordinates.slice();
+          const p = f.properties || {};
+          const name = p[PROP_MILL_NAME] || "Mill";
+          const type = p[PROP_MILL_TYPE] || "";
+
+          if (popup) popup.remove();
+          popup = new maplibregl.Popup({ closeOnClick: true })
+            .setLngLat(coords)
+            .setHTML(`<strong>${name}</strong><br/>${type ? `Type: ${type}` : ""}`)
+            .addTo(map);
+          return;
+        }
+
+        // brownfields
+        const bfHits = map.queryRenderedFeatures(e.point, { layers: ["brownfields-circle"] });
+        if (bfHits.length > 0) {
+          const f = bfHits[0];
+          const coords = f.geometry.coordinates.slice();
+          const p = f.properties || {};
+          const name = p[PROP_BF_NAME] || "Brownfield site";
+          const url = p[PROP_BF_URL] || null;
+
+          if (popup) popup.remove();
+          popup = new maplibregl.Popup({ closeOnClick: true })
+            .setLngLat(coords)
+            .setHTML(`
+              <strong>${name}</strong><br/>
+              ${url ? `<a href="${url}" target="_blank">EPA facility page</a>` : "No link available"}
+            `)
+            .addTo(map);
+          return;
+        }
+
+        // counties
+        const countyHits = map.queryRenderedFeatures(e.point, { layers: ["counties-fill"] });
+        if (countyHits.length > 0) {
+          const f = countyHits[0];
+          const p = f.properties || {};
+
+          const countyName = p[PROP_COUNTY_NAME] || "County";
+          const stateFips = p[PROP_STATE] || "";
+          const stateName = getStateName(stateFips);
+
+          function fmt(x) {
+            return Number.isFinite(x) ? x.toFixed(3) : "n/a";
+          }
+
+          let sections = "";
+          DIMENSIONS.forEach(dim => {
+            const subs = dim.subs || [];
+            if (!subs.length) return;
+            let rows = "";
+            subs.forEach(sub => {
+              const val = Number(p[sub.field]);
+              rows += `<div>${sub.label}: ${fmt(val)}</div>`;
+            });
+            sections += `
+              <div style="margin-top:4px;font-size:12px;">
+                <strong>${dim.group || ""} – ${dim.label} (${stateName})</strong><br/>
+                ${rows}
+              </div>
+            `;
+          });
+
+          if (popup) popup.remove();
+          popup = new maplibregl.Popup({ closeOnClick: true, maxWidth: "300px" })
+            .setLngLat(e.lngLat)
+            .setHTML(`<strong>${countyName}, ${stateName}</strong><br/>${sections}`)
+            .addTo(map);
+        }
+      });
+
+      ["counties-fill", "mills-circle", "brownfields-circle"]
+        .forEach(id => {
+          map.on("mouseenter", id, () => { map.getCanvas().style.cursor = "pointer"; });
+          map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; });
+        });
+    });
+  </script>
+</body>
+</html>
